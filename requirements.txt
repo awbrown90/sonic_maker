@@ -1,0 +1,4 @@
+# Versions this editor is developed and tested against.
+numpy==1.26.4
+pygame==2.6.1
+stable-retro==0.9.8

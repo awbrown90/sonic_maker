@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtualenvs
+.venv/
+venv/
+veve/
+
+# Capture output: regenerable from the level it came from.
+sonic_maker_visualizations/*.png
