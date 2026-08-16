@@ -1350,16 +1350,30 @@ class SemanticTheme:
         self.bands = self._parallax_bands(
             np.random.default_rng(self.seed + 977))
 
+    def _texture_search_dirs(self) -> tuple[Path, ...]:
+        """Theme folder first, then the shared texture directory."""
+        if self.texture_dir is None:
+            return ()
+        found = []
+        theme_dir = self.texture_dir / self.name
+        if theme_dir.is_dir():
+            found.append(theme_dir)
+        if self.texture_dir.is_dir():
+            found.append(self.texture_dir)
+        return tuple(found)
+
     def reload(self) -> tuple[str, ...]:
         """Rebuild the placeholder sheets, then overlay any art on disk."""
         rng = np.random.default_rng(self.seed)
         self.sheets = {key: self._procedural_sheet(key, rng)
                        for key in MATERIALS}
         replaced = []
-        if self.texture_dir is not None and self.texture_dir.is_dir():
+        search_dirs = self._texture_search_dirs()
+        if search_dirs:
             for key, material in MATERIALS.items():
-                path = self.texture_dir / f"{key}.png"
-                if not path.is_file():
+                path = next((folder / f"{key}.png" for folder in search_dirs
+                             if (folder / f"{key}.png").is_file()), None)
+                if path is None:
                     continue
                 try:
                     self.sheets[key] = self._load_sheet(path, material)
@@ -1432,9 +1446,22 @@ class SemanticTheme:
         shade = np.where(mortar, 0.56, shade)
         return shade, np.array([1.0, 0.97, 0.86], dtype=np.float32)
 
-    @staticmethod
-    def _sky_gradient() -> np.ndarray:
+    def _dark_forest_theme(self) -> bool:
+        name = self.name.casefold()
+        return any(token in name for token in (
+            "forbidden", "forrest", "forest", "darkwood"))
+
+    def _sky_gradient(self) -> np.ndarray:
         ramp = np.linspace(0.0, 1.0, WORLD_HEIGHT, dtype=np.float32)[:, None]
+        if self._dark_forest_theme():
+            sky = (np.array((8, 10, 18), dtype=np.float32) * (1.0 - ramp) +
+                   np.array((26, 34, 42), dtype=np.float32) * ramp)
+            below = np.clip(
+                (np.arange(WORLD_HEIGHT, dtype=np.float32) - GROUND_Y) / 96.0,
+                0.0, 1.0)[:, None]
+            sky = sky * (1.0 - below) + np.array(
+                (6, 10, 12), dtype=np.float32) * below
+            return np.clip(sky, 0, 255).astype(np.uint8)
         sky = (np.array((74, 150, 236), dtype=np.float32) * (1.0 - ramp) +
                np.array((178, 216, 246), dtype=np.float32) * ramp)
         below = np.clip(
@@ -1448,6 +1475,14 @@ class SemanticTheme:
                         rng: np.random.Generator) -> tuple[ParallaxBand, ...]:
         # Distant bands are hazed toward the sky so the playfield, which is the
         # only thing Sonic can touch, always reads as the nearest layer.
+        if self._dark_forest_theme():
+            return (
+                self._mist_band(rng),
+                self._hill_band(rng, 86, (16, 22, 30), (24, 32, 40),
+                                0.22, 0.28, -40, cells=7),
+                self._hill_band(rng, 118, (10, 22, 16), (18, 36, 24),
+                                0.50, 0.56, -8, cells=11),
+            )
         return (
             self._cloud_band(rng),
             self._hill_band(rng, 74, (124, 172, 202), (162, 202, 224),
@@ -1455,6 +1490,28 @@ class SemanticTheme:
             self._hill_band(rng, 98, (86, 148, 150), (124, 184, 164),
                             0.55, 0.60, -6, cells=8),
         )
+
+    @staticmethod
+    def _mist_band(rng: np.random.Generator, height: int = 52,
+                   count: int = 10) -> ParallaxBand:
+        rows = np.arange(height, dtype=np.float32)[:, None]
+        columns = np.arange(PARALLAX_WIDTH, dtype=np.float32)[None, :]
+        field = np.zeros((height, PARALLAX_WIDTH), dtype=np.float32)
+        for _ in range(count):
+            center_x = rng.uniform(0, PARALLAX_WIDTH)
+            center_y = rng.uniform(height * 0.25, height * 0.85)
+            spread_x = rng.uniform(28, 70)
+            spread_y = rng.uniform(5, 12)
+            distance = np.abs(columns - center_x)
+            distance = np.minimum(distance, PARALLAX_WIDTH - distance)
+            field += np.exp(-((distance / spread_x) ** 2 +
+                              ((rows - center_y) / spread_y) ** 2))
+        alpha = np.clip((field - 0.38) * 1.8, 0.0, 1.0)
+        band = np.zeros((height, PARALLAX_WIDTH, 4), dtype=np.uint8)
+        band[..., :3] = (np.array((48, 62, 68), dtype=np.float32) *
+                         (0.70 + 0.30 * alpha)[..., None]).astype(np.uint8)
+        band[..., 3] = (alpha * 120).astype(np.uint8)
+        return ParallaxBand(band, 0.10, 0.14, -88)
 
     @staticmethod
     def _hill_band(rng: np.random.Generator, height: int,
