@@ -103,6 +103,30 @@ python3 sonic_maker.py
 Useful flags: `--scale {2,3,4}`, `--level-file`, `--levels-dir`,
 `--sprites`, `--textures`, `--visualizations`, and `--export-textures DIR`.
 
+## Playing the original game
+
+`play_sonic.py` plays the stock ROM with the keyboard — no editing, no custom
+level. It uses the same ROM and the same RAM map as the editor, so it doubles as
+a quick check that your import worked and as a reference for what unmodified
+Sonic 1 terrain looks like.
+
+```sh
+python3 play_sonic.py                 # Green Hill Act 1
+python3 play_sonic.py --level 3-2     # zone-act in game order (Spring Yard Act 2)
+python3 play_sonic.py --level LabyrinthZone.Act1
+```
+
+Arrows move, <kbd>Up</kbd> or <kbd>Space</kbd> jumps, <kbd>Down</kbd> ducks and
+rolls, <kbd>C</kbd> and <kbd>V</kbd> save and load a checkpoint, <kbd>Esc</kbd>
+quits.
+
+<kbd>A</kbd> toggles the collision overlay — green tops, blue solid, orange
+sides — decoded from the live chunk mappings and the ROM's height masks. It is
+the read-only counterpart to what the Tiles tab writes.
+
+Only levels that have a savestate are offered, so `6-3` is absent: Sonic 1's
+Scrap Brain Act 3 leads into Final Zone and has no start state.
+
 ## The four tabs
 
 **Tiles** — paint raw Sonic 1 collision masks, pick solidity (top / all / sides),
